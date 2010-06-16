@@ -958,6 +958,13 @@ is ignored and no empty line is inserted, to keep the list in tact."
   :group 'org-edit-structure
   :type 'hook)
 
+(defcustom org-insert-heading-always-after-current nil
+  "Non-nil means org-insert-heading will always insert a heading after 
+the current heading, even if the cursor is on the first character of a heading"
+  :tag "Org Always Insert Heading After Current Item"
+  :group 'org-structure
+  :type 'boolean)
+
 (defcustom org-enable-fixed-width-editor t
   "Non-nil means lines starting with \":\" are treated as fixed-width.
 This currently only means they are never auto-wrapped.
@@ -6305,7 +6312,7 @@ This is important for non-interactive uses of the command."
 	     (blank (if (eq blank-a 'auto) empty-line-p blank-a))
 	     pos hide-previous previous-pos)
 	(cond
-	 ((and (org-on-heading-p) (bolp)
+	 ((and (org-on-heading-p) (bolp) (not org-insert-heading-always-after-current)
 	       (or (bobp)
 		   (save-excursion (backward-char 1) (not (org-invisible-p)))))
 	  ;; insert before the current line

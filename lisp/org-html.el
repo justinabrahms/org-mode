@@ -6,7 +6,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.36trans
+;; Version: 7.01trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -26,7 +26,10 @@
 ;;
 ;;; Commentary:
 
+;;; Code:
+
 (require 'org-exp)
+
 (eval-when-compile (require 'cl))
 
 (declare-function org-id-find-id-file "org-id" (id))
@@ -57,7 +60,7 @@ by the footnotes themselves."
   :type 'string)
 
 (defcustom org-export-html-coding-system nil
-  "Coding system for HTML export, defaults to buffer-file-coding-system."
+  "Coding system for HTML export, defaults to `buffer-file-coding-system'."
   :group 'org-export-html
   :type 'coding-system)
 
@@ -81,7 +84,7 @@ and corresponding declarations."
 			(string :tag "Declaration")))))
 
 (defcustom org-export-html-style-include-scripts t
-  "Non-nil means include the javascript snippets in exported HTML files.
+  "Non-nil means include the JavaScript snippets in exported HTML files.
 The actual script is defined in `org-export-html-scripts' and should
 not be modified."
   :group 'org-export-html
@@ -110,7 +113,7 @@ not be modified."
  }
 /*]]>*///-->
 </script>"
-"Basic javascript that is needed by HTML files produced by Org-mode.")
+"Basic JavaScript that is needed by HTML files produced by Org-mode.")
 
 (defconst org-export-html-style-default
 "<style type=\"text/css\">
@@ -206,21 +209,127 @@ settings with <style>...</style> tags."
 ;;;###autoload
 (put 'org-export-html-style-extra 'safe-local-variable 'stringp)
 
+(defcustom org-export-html-mathjax-options
+  '((path  "http://orgmode.org/mathjax/MathJax.js")
+    (scale "100")
+    (align "center")
+    (indent "2em")
+    (mathml nil))
+  "Options for MathJax setup.
+
+path        The path where to find MathJax
+scale       Scaling for the HTML-CSS backend, usually between 100 and 133
+align       How to align display math: left, center, or right
+indent      If align is not center, how far from the left/right side?
+mathml      Should a MathML player be used if available?
+            This is faster and reduces bandwidth use, but currently
+            sometimes has lower spacing quality.  Therefore, the default is
+            nil.  When browsers get better, this switch can be flipped.
+
+You can also customize this for each buffer, using something like
+
+#+MATHJAX: scale:\"133\" align:\"right\" mathml:t path:\"/MathJax/\""
+  :group 'org-export-html
+  :type '(list :greedy t
+	      (list :tag "path   (the path from where to load MathJax.js)"
+		    (const :format "       " path) (string))
+	      (list :tag "scale  (scaling for the displayed math)"
+		    (const :format "       " scale) (string))
+	      (list :tag "align  (alignment of displayed equations)"
+		    (const :format "       " align) (string))
+	      (list :tag "indent (indentation with left or right alignment)"
+		    (const :format "       " indent) (string))
+	      (list :tag "mathml (should MathML display be used is possible)"
+		    (const :format "       " mathml) (boolean))))
+
+(defun org-export-html-mathjax-config (template options in-buffer)
+  "Insert the user setup into the matchjax template."
+  (let (name val (yes "   ") (no "// ") x)
+    (mapc
+     (lambda (e)
+       (setq name (car e) val (nth 1 e))
+       (if (string-match (concat "\\<" (symbol-name name) ":") in-buffer)
+	   (setq val (car (read-from-string
+			   (substring in-buffer (match-end 0))))))
+       (if (not (stringp val)) (setq val (format "%s" val)))
+       (if (string-match (concat "%" (upcase (symbol-name name))) template)
+	   (setq template (replace-match val t t template))))
+     options)
+    (setq val (nth 1 (assq 'mathml options)))
+    (if (string-match (concat "\\<mathml:") in-buffer)
+	(setq val (car (read-from-string
+			(substring in-buffer (match-end 0))))))
+    ;; Exchange prefixes depending on mathml setting
+    (if (not val) (setq x yes yes no no x))
+    ;; Replace cookies to turn on or off the config/jax lines
+    (if (string-match ":MMLYES:" template)
+	(setq template (replace-match yes t t template)))
+    (if (string-match ":MMLNO:" template)
+	(setq template (replace-match no t t template)))
+    ;; Return the modified template
+    template))
+
+(defcustom org-export-html-mathjax-template
+  "<script type=\"text/javascript\" src=\"%PATH\">
+<!--/*--><![CDATA[/*><!--*/
+    MathJax.Hub.Config({
+        // Only one of the two following lines, depending on user settings
+        // First allows browser-native MathML display, second forces HTML/CSS
+        :MMLYES: config: [\"MMLorHTML.js\"], jax: [\"input/TeX\"],
+        :MMLNO: jax: [\"input/TeX\", \"output/HTML-CSS\"],
+        extensions: [\"tex2jax.js\",\"TeX/AMSmath.js\",\"TeX/AMSsymbols.js\",
+                     \"TeX/noUndefined.js\"],
+        tex2jax: {
+            inlineMath: [ [\"\\\\(\",\"\\\\)\"] ],
+            displayMath: [ ['$$','$$'], [\"\\\\[\",\"\\\\]\"] ],
+            skipTags: [\"script\",\"noscript\",\"style\",\"textarea\",\"pre\",\"code\"],
+            ignoreClass: \"tex2jax_ignore\",
+            processEscapes: false,
+            processEnvironments: true,
+            preview: \"TeX\"
+        },
+        showProcessingMessages: true,
+        displayAlign: \"%ALIGN\",
+        displayIndent: \"%INDENT\",
+
+        \"HTML-CSS\": {
+             scale: %SCALE,
+             availableFonts: [\"STIX\",\"TeX\"],
+             preferredFont: \"TeX\",
+             webFont: \"TeX\",
+             imageFont: \"TeX\",
+             showMathMenu: true,
+        },
+        MMLorHTML: {
+             prefer: {
+                 MSIE:    \"MML\",
+                 Firefox: \"MML\",
+                 Opera:   \"HTML\",
+                 other:   \"HTML\"
+             }
+        }
+    });
+/*]]>*///-->
+</script>"
+  "The MathJax setup for XHTML files."
+  :group 'org-export-html
+  :type 'string)
+
 (defcustom org-export-html-tag-class-prefix ""
-  "Prefix to clas names for TODO keywords.
+  "Prefix to class names for TODO keywords.
 Each tag gets a class given by the tag itself, with this prefix.
 The default prefix is empty because it is nice to just use the keyword
 as a class name.  But if you get into conflicts with other, existing
-CSS classes, then this prefic can be very useful."
+CSS classes, then this prefix can be very useful."
   :group 'org-export-html
   :type 'string)
 
 (defcustom org-export-html-todo-kwd-class-prefix ""
-  "Prefix to clas names for TODO keywords.
+  "Prefix to class names for TODO keywords.
 Each TODO keyword gets a class given by the keyword itself, with this prefix.
 The default prefix is empty because it is nice to just use the keyword
 as a class name.  But if you get into conflicts with other, existing
-CSS classes, then this prefic can be very useful."
+CSS classes, then this prefix can be very useful."
   :group 'org-export-html
   :type 'string)
 
@@ -235,10 +344,11 @@ CSS classes, then this prefic can be very useful."
  |
  <a accesskey=\"H\" href=\"%s\"> HOME </a>
 </div>"
-  "Snippet used to insert the HOME and UP links.  This is a format,
-the first %s will receive the UP link, the second the HOME link.
-If both `org-export-html-link-up' and `org-export-html-link-home' are
-empty, the entire snippet will be ignored."
+  "Snippet used to insert the HOME and UP links.
+This is a format string, the first %s will receive the UP link,
+the second the HOME link.  If both `org-export-html-link-up' and
+`org-export-html-link-home' are empty, the entire snippet will be
+ignored."
   :group 'org-export-html
   :type 'string)
 
@@ -340,7 +450,7 @@ When nil, also column one will use data tags."
   :type 'boolean)
 
 (defcustom org-export-html-validation-link nil
-  "Non-nil means add validationlink to postamble of HTML exported files."
+  "Non-nil means add validation link to postamble of HTML exported files."
   :group 'org-export-html
   :type '(choice
 	  (const :tag "Nothing" nil)
@@ -349,9 +459,10 @@ When nil, also column one will use data tags."
 
 
 (defcustom org-export-html-with-timestamp nil
-  "If non-nil, write `org-export-html-html-helper-timestamp'
-into the exported HTML text.  Otherwise, the buffer will just be saved
-to a file."
+  "If non-nil, write timestamp into the exported HTML text.
+If non-nil Write `org-export-html-html-helper-timestamp' into the
+exported HTML text.  Otherwise, the buffer will just be saved to
+a file."
   :group 'org-export-html
   :type 'boolean)
 
@@ -426,7 +537,7 @@ This may also be a function, building and inserting the postamble.")
 ;;; HTML export
 
 (defun org-export-html-preprocess (parameters)
-  ;; Convert LaTeX fragments to images
+  "Convert LaTeX fragments to images."
   (when (and org-current-export-file
 	     (plist-get parameters :LaTeX-fragments))
     (org-format-latex
@@ -434,7 +545,13 @@ This may also be a function, building and inserting the postamble.")
 			(file-name-nondirectory
 			 org-current-export-file)))
      org-current-export-dir nil "Creating LaTeX image %s"
-     nil nil (eq (plist-get parameters :LaTeX-fragments) 'verbatim)))
+     nil nil
+     (cond
+      ((eq (plist-get parameters :LaTeX-fragments) 'verbatim) 'verbatim)
+      ((eq (plist-get parameters :LaTeX-fragments) 'mathjax ) 'mathjax)
+      ((eq (plist-get parameters :LaTeX-fragments) t        ) 'mathjax)
+      ((eq (plist-get parameters :LaTeX-fragments) 'dvipng  ) 'dvipng)
+      (t nil))))
   (goto-char (point-min))
   (let (label l1)
     (while (re-search-forward "\\\\ref{\\([^{}\n]+\\)}" nil t)
@@ -460,7 +577,8 @@ headlines.  The default is 3.  Lower levels will become bulleted lists."
 
 ;;;###autoload
 (defun org-export-as-html-batch ()
-  "Call `org-export-as-html', may be used in batch processing as
+  "Call the function `org-export-as-html'.
+This function can be used in batch processing as:
 emacs   --batch
         --load=$HOME/lib/emacs/org.el
         --eval \"(setq org-export-headline-levels 2)\"
@@ -540,12 +658,12 @@ in a window.  A non-interactive call will only return the buffer."
    nil
    "Function to convert link URLs to exportable URLs.
 Takes two arguments, TYPE and PATH.
-Returns exportable url as (TYPE PATH), or `nil' to signal that it
+Returns exportable url as (TYPE PATH), or nil to signal that it
 didn't handle this case.
 Intended to be locally bound around a call to `org-export-as-html'." )
 
 (defun org-html-cvt-org-as-html (opt-plist type path)
-   "Convert and org filename to an equivalent html filename.
+   "Convert an org filename to an equivalent html filename.
 If TYPE is not file, just return `nil'.
 See variable `org-export-html-link-org-files-as-html'"
 
@@ -565,21 +683,18 @@ See variable `org-export-html-link-org-files-as-html'"
 
 ;;; org-html-should-inline-p
 (defun org-html-should-inline-p (filename descp)
-   "Return non-nil if link FILENAME should be inlined, according to
-current settings.
-DESCP is the boolean of whether there was a link description.
-See variables `org-export-html-inline-images' and
+   "Return non-nil if link FILENAME should be inlined.
+The decision to inline the FILENAME link is based on the current
+settings.  DESCP is the boolean of whether there was a link
+description.  See variables `org-export-html-inline-images' and
 `org-export-html-inline-image-extensions'."
    (declare (special
 	     org-export-html-inline-images
 	     org-export-html-inline-image-extensions))
-   (or
-      (eq t org-export-html-inline-images)
-      (and
-	 org-export-html-inline-images
-	 (not descp)))
-   (org-file-image-p
-      filename org-export-html-inline-image-extensions))
+   (and (or (eq t org-export-html-inline-images)
+	    (and org-export-html-inline-images (not descp)))
+	(org-file-image-p
+	 filename org-export-html-inline-image-extensions)))
 
 ;;; org-html-make-link
 (defun org-html-make-link (opt-plist type path fragment desc attr
@@ -809,6 +924,7 @@ PUB-DIR is set, use this as the publishing directory."
 	  (buffer-substring
 	   (if region-p (region-beginning) (point-min))
 	   (if region-p (region-end) (point-max))))
+	 (org-export-have-math nil)
 	 (lines
 	  (org-split-string
 	   (org-export-preprocess-string
@@ -832,6 +948,16 @@ PUB-DIR is set, use this as the publishing directory."
 	    :LaTeX-fragments
 	    (plist-get opt-plist :LaTeX-fragments))
 	   "[\r\n]"))
+	 (mathjax
+	  (if (or (eq (plist-get opt-plist :LaTeX-fragments) 'mathjax)
+		  (and org-export-have-math
+		       (eq (plist-get opt-plist :LaTeX-fragments) t)))
+
+	      (org-export-html-mathjax-config
+	       org-export-html-mathjax-template
+	       org-export-html-mathjax-options
+	       (or (plist-get opt-plist :mathjax) ""))
+	    ""))
 	 table-open type
 	 table-buffer table-orig-buffer
 	 ind item-type starter didclose
@@ -901,6 +1027,7 @@ lang=\"%s\" xml:lang=\"%s\">
 <meta name=\"description\" content=\"%s\"/>
 <meta name=\"keywords\" content=\"%s\"/>
 %s
+%s
 </head>
 <body>
 <div id=\"content\">
@@ -919,6 +1046,7 @@ lang=\"%s\" xml:lang=\"%s\">
 		 (or charset "iso-8859-1")
 		 date author description keywords
 		 style
+		 mathjax
 		 (if (or link-up link-home)
 		     (concat
 		      (format org-export-html-home/up-format
@@ -967,7 +1095,7 @@ lang=\"%s\" xml:lang=\"%s\">
 					 (org-search-todo-below
 					  line lines level))))
 			  (if (string-match
-			       (org-re "[ \t]+:\\([[:alnum:]_@:]+\\):[ \t]*$") txt)
+			       (org-re "[ \t]+:\\([[:alnum:]_@#%:]+\\):[ \t]*$") txt)
 			      (setq txt (replace-match  "&nbsp;&nbsp;&nbsp;<span class=\"tag\"> \\1</span>" t nil txt)))
 			  (if (string-match quote-re0 txt)
 			      (setq txt (replace-match "" t t txt)))
@@ -2018,7 +2146,7 @@ that uses these same face definitions."
   (goto-char (point-min)))
 
 (defun org-html-protect (s)
-  ;; convert & to &amp;, < to &lt; and > to &gt;
+  "convert & to &amp;, < to &lt; and > to &gt;"
   (let ((start 0))
     (while (string-match "&" s start)
       (setq s (replace-match "&amp;" t t s)
@@ -2033,10 +2161,10 @@ that uses these same face definitions."
   s)
 
 (defun org-html-expand (string)
-  "Prepare STRING for HTML export.  Applies all active conversions.
+  "Prepare STRING for HTML export.  Apply all active conversions.
 If there are links in the string, don't modify these."
   (let* ((re (concat org-bracket-link-regexp "\\|"
-		     (org-re "[ \t]+\\(:[[:alnum:]_@:]+:\\)[ \t]*$")))
+		     (org-re "[ \t]+\\(:[[:alnum:]_@#%:]+:\\)[ \t]*$")))
 	 m s l res)
     (if (string-match "^[ \t]*\\+-[-+]*\\+[ \t]*$" string)
 	string
@@ -2200,7 +2328,7 @@ When TITLE is nil, just close all open levels."
     (when title
       ;; If title is nil, this means this function is called to close
       ;; all levels, so the rest is done only if title is given
-	(when (string-match (org-re "\\(:[[:alnum:]_@:]+:\\)[ \t]*$") title)
+	(when (string-match (org-re "\\(:[[:alnum:]_@#%:]+:\\)[ \t]*$") title)
 	  (setq title (replace-match
 		       (if org-export-with-tags
 			   (save-match-data

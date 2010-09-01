@@ -4,7 +4,7 @@
 ;;
 ;; Emacs Lisp Archive Entry
 ;; Filename: org-docbook.el
-;; Version: 6.36trans
+;; Version: 7.01trans
 ;; Author: Baoqiu Cui <cbaoqiu AT yahoo DOT com>
 ;; Maintainer: Baoqiu Cui <cbaoqiu AT yahoo DOT com>
 ;; Keywords: org, wp, docbook
@@ -26,7 +26,7 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
-;; Commentary:
+;;; Commentary:
 ;;
 ;; This library implements a DocBook exporter for org-mode.  The basic
 ;; idea and design is very similar to what `org-export-as-html' has.
@@ -142,8 +142,8 @@ people work on the same document."
   :type 'string)
 
 (defcustom org-export-docbook-footnote-id-prefix "fn-"
-  "The prefix of footnote IDs used during exporting.  Like
-`org-export-docbook-section-id-prefix', this variable can help
+  "The prefix of footnote IDs used during exporting.
+Like `org-export-docbook-section-id-prefix', this variable can help
 avoid same set of footnote IDs being used multiple times."
   :group 'org-export-docbook
   :type 'string)
@@ -155,7 +155,7 @@ avoid same set of footnote IDs being used multiple times."
     ("=" "<code>" "</code>")
     ("~" "<literal>" "</literal>")
     ("+" "<emphasis role=\"strikethrough\">" "</emphasis>"))
-  "Alist of DocBook expressions to convert emphasis fontifiers.
+  "A list of DocBook expressions to convert emphasis fontifiers.
 Each element of the list is a list of three elements.
 The first element is the character used as a marker for fontification.
 The second element is a formatting string to wrap fontified text with.
@@ -1249,7 +1249,7 @@ When TITLE is nil, just close all open levels."
       ;; all levels, so the rest is done only if title is given.
       ;;
       ;; Format tags: put them into a superscript like format.
-      (when (string-match (org-re "\\(:[[:alnum:]_@:]+:\\)[ \t]*$") title)
+      (when (string-match (org-re "\\(:[[:alnum:]_@#%:]+:\\)[ \t]*$") title)
 	(setq title
 	      (replace-match
 	       (if org-export-with-tags
@@ -1273,7 +1273,7 @@ When TITLE is nil, just close all open levels."
 Applies all active conversions.  If there are links in the
 string, don't modify these."
   (let* ((re (concat org-bracket-link-regexp "\\|"
-		     (org-re "[ \t]+\\(:[[:alnum:]_@:]+:\\)[ \t]*$")))
+		     (org-re "[ \t]+\\(:[[:alnum:]_@#%:]+:\\)[ \t]*$")))
 	 m s l res)
     (while (setq m (string-match re string))
       (setq s (substring string 0 m)

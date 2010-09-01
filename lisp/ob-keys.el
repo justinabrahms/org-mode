@@ -5,7 +5,7 @@
 ;; Author: Eric Schulte
 ;; Keywords: literate programming, reproducible research
 ;; Homepage: http://orgmode.org
-;; Version: 0.01
+;; Version: 7.01trans
 
 ;; This file is part of GNU Emacs.
 
@@ -33,31 +33,34 @@
 (require 'ob)
 
 (defvar org-babel-key-prefix "\C-c\C-v"
-  "The `org-babel-key-prefix' variable holds the key prefix
-behind which all org-babel interactive key-binding are placed.
+  "The key prefix for Babel interactive key-bindings.
 See `org-babel-key-bindings' for the list of interactive babel
 functions which are assigned key bindings, and see
 `org-babel-map' for the actual babel keymap.")
 
 (defvar org-babel-map (make-sparse-keymap)
-  "The keymap holding key bindings for interactive org-babel
-functions.")
+  "The keymap for interactive Babel functions.")
 
 ;;;###autoload
 (defun org-babel-describe-bindings ()
-  "Describe all key binding placed behind the
-`org-babel-key-prefix' prefix."
+  "Describe all keybindings behind `org-babel-key-prefix'."
   (interactive)
   (describe-bindings org-babel-key-prefix))
 
 (defvar org-babel-key-bindings
-  '(("e" . org-babel-execute-src-block)
-    ("\C-e" . org-babel-execute-src-block)
+  '(("p" . org-babel-previous-src-block)
+    ("\C-p" . org-babel-previous-src-block)
+    ("n" . org-babel-next-src-block)
+    ("\C-n" . org-babel-next-src-block)
+    ("e" . org-babel-execute-maybe)
+    ("\C-e" . org-babel-execute-maybe)
     ("o" . org-babel-open-src-block-result)
     ("\C-o" . org-babel-open-src-block-result)
-    ("\C-p" . org-babel-expand-src-block)
-    ("p" . org-babel-expand-src-block)
-    ("g" . org-babel-goto-named-source-block)
+    ("\C-v" . org-babel-expand-src-block)
+    ("v" . org-babel-expand-src-block)
+    ("g" . org-babel-goto-named-src-block)
+    ("r" . org-babel-goto-named-result)
+    ("\C-r" . org-babel-goto-named-result)
     ("\C-b" . org-babel-execute-buffer)
     ("b" . org-babel-execute-buffer)
     ("\C-s" . org-babel-execute-subtree)
@@ -66,15 +69,19 @@ functions.")
     ("t" . org-babel-tangle)
     ("\C-f" . org-babel-tangle-file)
     ("f" . org-babel-tangle-file)
-    ("\C-l" . org-babel-lob-ingest)
-    ("l" . org-babel-lob-ingest)
+    ("\C-l" . org-babel-load-in-session)
+    ("l" . org-babel-load-in-session)
+    ("\C-i" . org-babel-lob-ingest)
+    ("i" . org-babel-lob-ingest)
     ("\C-z" . org-babel-switch-to-session)
-    ("z" . org-babel-switch-to-session)
+    ("z" . org-babel-switch-to-session-with-code)
     ("\C-a" . org-babel-sha1-hash)
     ("a" . org-babel-sha1-hash)
-    ("h" . org-babel-describe-bindings))
-  "Alist associating key bindings with interactive Org-babel
-functions.  This list associates interactive org-babel functions
+    ("h" . org-babel-describe-bindings)
+    ("\C-x" . org-babel-do-key-sequence-in-edit-buffer)
+    ("x" . org-babel-do-key-sequence-in-edit-buffer))
+  "Alist of key bindings and interactive Babel functions.
+This list associates interactive Babel functions
 with keys.  Each element of this list will add an entry to the
 `org-babel-map' using the letter key which is the `car' of the
 a-list placed behind the generic `org-babel-key-prefix'.")

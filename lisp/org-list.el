@@ -7,7 +7,7 @@
 ;;	   Bastien Guerry <bzg AT altern DOT org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.36trans
+;; Version: 7.01trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -51,7 +51,8 @@
 (declare-function org-get-indentation "org" (&optional line))
 (declare-function org-timer-item "org-timer" (&optional arg))
 (declare-function org-combine-plists "org" (&rest plists))
-(declare-function org-entry-get "org" (pom property &optional inherit))
+(declare-function org-entry-get "org"
+		  (pom property &optional inherit literal-nil))
 (declare-function org-narrow-to-subtree "org" ())
 (declare-function org-show-subtree "org" ())
 
@@ -195,19 +196,19 @@ When the indentation would be larger than this, it will become
 % END RECEIVE ORGLST %n
 \\begin{comment}
 #+ORGLST: SEND %n org-list-to-latex
-| | |
+-
 \\end{comment}\n")
     (texinfo-mode "@c BEGIN RECEIVE ORGLST %n
 @c END RECEIVE ORGLST %n
 @ignore
 #+ORGLST: SEND %n org-list-to-texinfo
-| | |
+-
 @end ignore\n")
     (html-mode "<!-- BEGIN RECEIVE ORGLST %n -->
 <!-- END RECEIVE ORGLST %n -->
 <!--
 #+ORGLST: SEND %n org-list-to-html
-| | |
+-
 -->\n"))
   "Templates for radio lists in different major modes.
 All occurrences of %n in a template will be replaced with the name of the
@@ -624,7 +625,7 @@ If the cursor is not in an item, throw an error."
 
 (defun org-end-of-item-text-before-children ()
   "Move to the end of the item text, stops before the first child if any.
-Assumes that the cursor is in the first ine of an item."
+Assumes that the cursor is in the first line of an item."
   (goto-char
    (min (save-excursion (org-end-of-item) (point))
 	(save-excursion
@@ -1019,7 +1020,7 @@ I.e. to the text after the last item."
 
 (defun org-outdent-item-tree (arg &optional no-subtree)
   "Outdent a local list item including its children.
-If NO-SUBTREE is set, only outdend the item itself, not its children."
+If NO-SUBTREE is set, only outdent the item itself, not its children."
   (interactive "p")
   (org-indent-item-tree (- arg) no-subtree))
 
@@ -1277,36 +1278,34 @@ this list."
     (save-excursion
       (org-list-goto-true-beginning)
       (beginning-of-line 0)
-      (unless (looking-at "#\\+ORGLST: *SEND +\\([a-zA-Z0-9_]+\\) +\\([^ \t\r\n]+\\)\\( +.*\\)?")
+      (unless (looking-at "[ \t]*#\\+ORGLST[: \t][ \t]*SEND[ \t]+\\([^ \t\r\n]+\\)[ \t]+\\([^ \t\r\n]+\\)\\([ \t]+.*\\)?")
 	(if maybe
 	    (throw 'exit nil)
 	  (error "Don't know how to transform this list"))))
     (let* ((name (match-string 1))
 	   (transform (intern (match-string 2)))
 	   (item-beginning (org-list-item-beginning))
-	   (txt (buffer-substring-no-properties
-		 (car item-beginning)
-		 (org-list-end (cdr item-beginning))))
-	   (list (org-list-parse-list))
-	   beg)
+	   (list (save-excursion (org-list-goto-true-beginning)
+				 (org-list-parse-list)))
+	   txt beg)
       (unless (fboundp transform)
 	(error "No such transformation function %s" transform))
-      (setq txt (funcall transform list))
-      ;; Find the insertion place
-      (save-excursion
-	(goto-char (point-min))
-	(unless (re-search-forward
-		 (concat "BEGIN RECEIVE ORGLST +" name "\\([ \t]\\|$\\)") nil t)
-	  (error "Don't know where to insert translated list"))
-	(goto-char (match-beginning 0))
-	(beginning-of-line 2)
-	(setq beg (point))
-	(unless (re-search-forward (concat "END RECEIVE ORGLST +" name) nil t)
-	  (error "Cannot find end of insertion region"))
-	(beginning-of-line 1)
-	(delete-region beg (point))
-	(goto-char beg)
-	(insert txt "\n"))
+      (let ((txt (funcall transform list)))
+	;; Find the insertion place
+	(save-excursion
+	  (goto-char (point-min))
+	  (unless (re-search-forward
+		   (concat "BEGIN RECEIVE ORGLST +" name "\\([ \t]\\|$\\)") nil t)
+	    (error "Don't know where to insert translated list"))
+	  (goto-char (match-beginning 0))
+	  (beginning-of-line 2)
+	  (setq beg (point))
+	  (unless (re-search-forward (concat "END RECEIVE ORGLST +" name) nil t)
+	    (error "Cannot find end of insertion region"))
+	  (beginning-of-line 1)
+	  (delete-region beg (point))
+	  (goto-char beg)
+	  (insert txt "\n")))
       (message "List converted and installed at receiver location"))))
 
 (defun org-list-to-generic (list params)
@@ -1388,7 +1387,7 @@ Valid parameters PARAMS are
 
 (defun org-list-to-latex (list &optional params)
   "Convert LIST into a LaTeX list.
-LIST is as returnd by `org-list-parse-list'.  PARAMS is a property list
+LIST is as returned by `org-list-parse-list'.  PARAMS is a property list
 with overruling parameters for `org-list-to-generic'."
   (org-list-to-generic
    list
@@ -1405,7 +1404,7 @@ with overruling parameters for `org-list-to-generic'."
 
 (defun org-list-to-html (list &optional params)
   "Convert LIST into a HTML list.
-LIST is as returnd by `org-list-parse-list'.  PARAMS is a property list
+LIST is as returned by `org-list-parse-list'.  PARAMS is a property list
 with overruling parameters for `org-list-to-generic'."
   (org-list-to-generic
    list
@@ -1422,7 +1421,7 @@ with overruling parameters for `org-list-to-generic'."
 
 (defun org-list-to-texinfo (list &optional params)
   "Convert LIST into a Texinfo list.
-LIST is as returnd by `org-list-parse-list'.  PARAMS is a property list
+LIST is as returned by `org-list-parse-list'.  PARAMS is a property list
 with overruling parameters for `org-list-to-generic'."
   (org-list-to-generic
    list

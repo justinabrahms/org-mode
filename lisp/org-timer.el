@@ -5,7 +5,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.36trans
+;; Version: 7.01trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -26,6 +26,8 @@
 ;;; Commentary:
 
 ;; This file contains the relative timer code for Org-mode
+
+;;; Code:
 
 (require 'org)
 
@@ -102,7 +104,7 @@ the region 0:00:00."
 	  (setq delta (org-timer-hms-to-secs (org-timer-fix-incomplete s)))))
 	(setq org-timer-start-time
 	      (seconds-to-time
-	       (- (org-float-time) (org-timer-hms-to-secs s)))))
+	       (- (org-float-time) delta))))
       (org-timer-set-mode-line 'on)
       (message "Timer start time set to %s, current value is %s"
 	       (format-time-string "%T" org-timer-start-time)
@@ -110,7 +112,8 @@ the region 0:00:00."
       (run-hooks 'org-timer-start-hook))))
 
 (defun org-timer-pause-or-continue (&optional stop)
-  "Pause or continue the relative timer.  With prefix arg, stop it entirely."
+  "Pause or continue the relative timer.
+With prefix arg STOP, stop it entirely."
   (interactive "P")
   (cond
    (stop (org-timer-stop))
@@ -145,8 +148,9 @@ the region 0:00:00."
 (defun org-timer (&optional restart)
   "Insert a H:MM:SS string from the timer into the buffer.
 The first time this command is used, the timer is started.  When used with
-a `C-u' prefix, force restarting the timer.
-When used with a double prefix arg `C-u C-u', change all the timer string
+a \\[universal-argument] prefix, force restarting the timer.
+When used with a double prefix argument \
+\\[universal-argument] \\universal-argument], change all the timer string
 in the region by a fixed amount.  This can be used to recalibrate a timer
 that was not started at the correct moment."
   (interactive "P")
